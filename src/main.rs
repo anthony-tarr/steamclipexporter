@@ -1,10 +1,12 @@
 use clap::Parser;
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use tempfile::TempDir;
 
 mod steam_api;
@@ -32,11 +34,21 @@ struct AppDetails {
     properties: HashMap<String, serde_json::Value>,
 }
 
+lazy_static! {
+    pub static ref VERBOSE_MODE: AtomicBool = AtomicBool::new(false);
+}
+
 const INIT_VIDEO_FILE: &str = "init-stream0.m4s";
 const INIT_AUDIO_FILE: &str = "init-stream1.m4s";
 
 fn main() {
     let args = Args::parse();
+
+    VERBOSE_MODE.store(args.verbose, Ordering::Relaxed);
+    if VERBOSE_MODE.load(Ordering::Relaxed) {
+        println!("Running in verbose mode...")
+    }
+
     let directory_path = Path::new(args.directory.as_str());
     let output_path = args
         .output
