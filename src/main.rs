@@ -64,7 +64,11 @@ fn main() {
 
             for directory in subdirectories {
                 cleanup(&tmp_dir); // Just in case there's hanging temp files
-                export_clip_at_directory(directory, &output_path, &tmp_dir);
+                if let Err(error) =
+                    export_clip_at_directory(directory.as_str(), &output_path, &tmp_dir)
+                {
+                    println!("Failed to export clip at {}: {}", directory, error);
+                }
             }
 
             match output_path {
@@ -84,13 +88,17 @@ fn main() {
     }
 }
 
-fn export_clip_at_directory(directory: String, output_dir: &Option<PathBuf>, tmp_dir: &TempDir) {
+fn export_clip_at_directory(
+    directory: &str,
+    output_dir: &Option<PathBuf>,
+    tmp_dir: &TempDir,
+) -> io::Result<()> {
     println!("Processing directory: {:?}", directory);
 
-    let (steam_id, date, time) = utils::parse_clip_string(directory.as_str());
+    let (steam_id, date, time) = utils::parse_clip_string(directory);
     let game_name = get_game_name_from_id(steam_id);
 
-    let video_clips_directory = validate_clip_directory(directory.as_str())
+    let video_clips_directory = validate_clip_directory(directory)
         .map(|res| res.unwrap_or_default())
         .unwrap_or_default();
 
@@ -103,7 +111,7 @@ fn export_clip_at_directory(directory: String, output_dir: &Option<PathBuf>, tmp
         output_file_name,
         output_dir,
         tmp_dir,
-    );
+    )
 }
 
 fn get_game_name_from_id(steam_id: u64) -> String {
@@ -206,7 +214,7 @@ fn concat_video_files(
     let mut output_file = File::create(tmp_dir.path().join("tmp_video.mp4"))?;
     let mut init_file = File::open(init_video_file_path)?;
 
-    io::copy(&mut init_file, &mut output_file);
+    io::copy(&mut init_file, &mut output_file)?;
 
     // Collect and sort chunk files
     let mut chunk_files: Vec<_> = fs::read_dir(dir)?
@@ -249,7 +257,7 @@ fn concat_audio_files(
     let mut output_file = File::create(tmp_dir.path().join("tmp_audio.mp4"))?;
     let mut init_file = File::open(init_audio_file_path)?;
 
-    io::copy(&mut init_file, &mut output_file);
+    io::copy(&mut init_file, &mut output_file)?;
 
     // Collect and sort chunk files
     let mut chunk_files: Vec<_> = fs::read_dir(dir)?

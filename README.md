@@ -20,4 +20,4 @@ You can specify an output directory using -o. All clips will end up there:
 
 ## Contributing
 
-Please feel free to open CRs or make improvements in any way.
+Please feel free to open PRs or make improvements in any way.
