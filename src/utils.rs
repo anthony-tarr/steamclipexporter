@@ -20,17 +20,34 @@ pub fn sort_chunks(chunk_files: &mut Vec<PathBuf>) {
     });
 }
 
-pub fn parse_clip_string(clip_string: &str) -> (u64, u64, u64) {
+pub fn parse_clip_string(clip_string: &str) -> Result<(u64, u64, u64), String> {
     let path = Path::new(clip_string);
-    let last_part = path.file_name().unwrap().to_str().unwrap();
-    let trimmed_part = last_part.trim_start_matches("clip_");
-    let parts: Vec<&str> = trimmed_part.split('_').collect();
-    println!("parts: {:?}", parts);
-    let clip_number = parts[0].parse().unwrap();
-    let date = parts[1].parse().unwrap();
-    let time = parts[2].parse().unwrap();
+    let last_part = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| format!("Invalid clip path: {clip_string}"))?;
+    let trimmed_part = last_part
+        .strip_prefix("clip_")
+        .ok_or_else(|| format!("Clip directory must start with 'clip_': {last_part}"))?;
+    let mut parts = trimmed_part.split('_');
 
-    (clip_number, date, time)
+    let clip_number = parse_clip_part(parts.next(), "Steam app id", last_part)?;
+    let date = parse_clip_part(parts.next(), "date", last_part)?;
+    let time = parse_clip_part(parts.next(), "time", last_part)?;
+
+    if parts.next().is_some() {
+        return Err(format!(
+            "Clip directory has unexpected extra parts: {last_part}"
+        ));
+    }
+
+    Ok((clip_number, date, time))
+}
+
+fn parse_clip_part(part: Option<&str>, label: &str, clip_name: &str) -> Result<u64, String> {
+    let part = part.ok_or_else(|| format!("Clip directory is missing {label}: {clip_name}"))?;
+    part.parse::<u64>()
+        .map_err(|_| format!("Clip directory has invalid {label}: {clip_name}"))
 }
 
 #[cfg(test)]
@@ -58,9 +75,18 @@ mod tests {
 
     #[test]
     fn test_parse_clip_string() {
-        let (steam_id, date, time) = parse_clip_string("clip_12345_20250101_120000");
+        let (steam_id, date, time) =
+            parse_clip_string("clip_12345_20250101_120000").expect("valid clip name");
         assert_eq!(steam_id, 12345);
         assert_eq!(date, 20250101);
         assert_eq!(time, 120000);
+    }
+
+    #[test]
+    fn test_parse_clip_string_rejects_invalid_names() {
+        assert!(parse_clip_string("not_a_clip").is_err());
+        assert!(parse_clip_string("clip_12345_20250101").is_err());
+        assert!(parse_clip_string("clip_invalid_20250101_120000").is_err());
+        assert!(parse_clip_string("clip_12345_20250101_120000_extra").is_err());
     }
 }

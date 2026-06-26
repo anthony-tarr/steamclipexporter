@@ -95,7 +95,8 @@ fn export_clip_at_directory(
 ) -> io::Result<()> {
     println!("Processing directory: {:?}", directory);
 
-    let (steam_id, date, time) = utils::parse_clip_string(directory);
+    let (steam_id, date, time) = utils::parse_clip_string(directory)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     let game_name = get_game_name_from_id(steam_id);
 
     let video_clips_directory = validate_clip_directory(directory)
