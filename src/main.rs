@@ -99,9 +99,12 @@ fn export_clip_at_directory(
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
     let game_name = get_game_name_from_id(steam_id);
 
-    let video_clips_directory = validate_clip_directory(directory)
-        .map(|res| res.unwrap_or_default())
-        .unwrap_or_default();
+    let video_clips_directory = validate_clip_directory(directory)?.ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("No video/bg_* directory found in clip: {directory}"),
+        )
+    })?;
 
     println!("Clips directory: {}", video_clips_directory);
 
