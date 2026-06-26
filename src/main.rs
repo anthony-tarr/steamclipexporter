@@ -40,6 +40,7 @@ lazy_static! {
 
 const INIT_VIDEO_FILE: &str = "init-stream0.m4s";
 const INIT_AUDIO_FILE: &str = "init-stream1.m4s";
+const PROGRESS_BAR_WIDTH: usize = 30;
 
 fn main() {
     let args = Args::parse();
@@ -61,18 +62,28 @@ fn main() {
     // TODO: validate we're in the right directory with the right subdirectories
     match get_subdirectories(directory_path) {
         Ok(subdirectories) => {
-            println!("Processing {} clips...", subdirectories.len());
+            let total_clips = subdirectories.len();
+            let mut exported_clips = 0;
+            let mut failed_clips = 0;
+
+            println!("Processing {} clips...", total_clips);
+            print_export_progress(exported_clips, failed_clips, total_clips);
 
             for directory in subdirectories {
                 cleanup(&tmp_dir); // Just in case there's hanging temp files
-                if let Err(error) = export_clip_at_directory(
+                match export_clip_at_directory(
                     directory.as_str(),
                     &output_path,
                     &tmp_dir,
                     &mut game_name_cache,
                 ) {
-                    println!("Failed to export clip at {}: {}", directory, error);
+                    Ok(()) => exported_clips += 1,
+                    Err(error) => {
+                        failed_clips += 1;
+                        println!("Failed to export clip at {}: {}", directory, error);
+                    }
                 }
+                print_export_progress(exported_clips, failed_clips, total_clips);
             }
 
             match output_path {
@@ -90,6 +101,32 @@ fn main() {
             )
         }
     }
+}
+
+fn print_export_progress(exported_clips: usize, failed_clips: usize, total_clips: usize) {
+    let processed_clips = exported_clips + failed_clips;
+    let filled_width = if total_clips == 0 {
+        0
+    } else {
+        processed_clips * PROGRESS_BAR_WIDTH / total_clips
+    };
+    let empty_width = PROGRESS_BAR_WIDTH - filled_width;
+    let percent = if total_clips == 0 {
+        0
+    } else {
+        processed_clips * 100 / total_clips
+    };
+
+    println!(
+        "Export progress: [{}{}] {}/{} processed, {} exported, {} failed ({}%)",
+        "#".repeat(filled_width),
+        "-".repeat(empty_width),
+        processed_clips,
+        total_clips,
+        exported_clips,
+        failed_clips,
+        percent
+    );
 }
 
 fn export_clip_at_directory(

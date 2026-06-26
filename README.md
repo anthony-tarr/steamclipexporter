@@ -14,6 +14,18 @@ You can specify an output directory using -o. All clips will end up there:
 
 `steamclipexporter -d <directory of clips> -o <output directory>`
 
+## Building
+
+Build a debug binary:
+
+`cargo build`
+
+Build an optimized release binary:
+
+`cargo build --release`
+
+The release executable will be created in `target/release`.
+
 ## Developing
 
 `cargo run -- -d <directory> -o <output dir>`
