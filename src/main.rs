@@ -56,6 +56,7 @@ fn main() {
 
     let tmp_dir = tempfile::tempdir().expect("Failed to create temporary directory");
     println!("Creating temp directory in: {:?}", tmp_dir.path());
+    let mut game_name_cache = HashMap::new();
 
     // TODO: validate we're in the right directory with the right subdirectories
     match get_subdirectories(directory_path) {
@@ -64,9 +65,12 @@ fn main() {
 
             for directory in subdirectories {
                 cleanup(&tmp_dir); // Just in case there's hanging temp files
-                if let Err(error) =
-                    export_clip_at_directory(directory.as_str(), &output_path, &tmp_dir)
-                {
+                if let Err(error) = export_clip_at_directory(
+                    directory.as_str(),
+                    &output_path,
+                    &tmp_dir,
+                    &mut game_name_cache,
+                ) {
                     println!("Failed to export clip at {}: {}", directory, error);
                 }
             }
@@ -92,12 +96,13 @@ fn export_clip_at_directory(
     directory: &str,
     output_dir: &Option<PathBuf>,
     tmp_dir: &TempDir,
+    game_name_cache: &mut HashMap<u64, String>,
 ) -> io::Result<()> {
     println!("Processing directory: {:?}", directory);
 
     let (steam_id, date, time) = utils::parse_clip_string(directory)
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    let game_name = get_game_name_from_id(steam_id);
+    let game_name = get_game_name_from_id(steam_id, game_name_cache);
 
     let video_clips_directory = validate_clip_directory(directory)?.ok_or_else(|| {
         io::Error::new(
@@ -118,8 +123,12 @@ fn export_clip_at_directory(
     )
 }
 
-fn get_game_name_from_id(steam_id: u64) -> String {
-    return match steam_api::get_app_details(steam_id) {
+fn get_game_name_from_id(steam_id: u64, game_name_cache: &mut HashMap<u64, String>) -> String {
+    if let Some(game_name) = game_name_cache.get(&steam_id) {
+        return game_name.clone();
+    }
+
+    let game_name = match steam_api::get_app_details(steam_id) {
         Ok(app_details) => app_details
             .properties
             .get(&steam_id.to_string())
@@ -141,6 +150,9 @@ fn get_game_name_from_id(steam_id: u64) -> String {
             "clip".to_string() // default to "clip" in the filename
         }
     };
+
+    game_name_cache.insert(steam_id, game_name.clone());
+    game_name
 }
 
 fn validate_directory(path: &str) -> Result<String, String> {
